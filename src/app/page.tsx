@@ -1,65 +1,111 @@
-import Image from "next/image";
+'use client';
+
+import { useState, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
+import UploadZone from '@/components/UploadZone';
+import DemographicsForm from '@/components/DemographicsForm';
+import type { Patient } from '@/types';
 
 export default function Home() {
+  const router = useRouter();
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [demographics, setDemographics] = useState<Patient | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleDemographicsChange = useCallback((demo: Patient) => {
+    setDemographics(demo);
+    setError(null);
+  }, []);
+
+  const handleFileSelect = useCallback(async (file: File) => {
+    if (!demographics) {
+      setError('Please enter your demographics first');
+      return;
+    }
+
+    setIsUploading(true);
+    setUploadProgress(0);
+    setError(null);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('age', demographics.age.toString());
+      formData.append('sex', demographics.sex);
+
+      const response = await fetch('/api/process', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const contentType = response.headers.get('content-type');
+      let data;
+      
+      if (!response.ok) {
+        const text = await response.text();
+        try {
+          data = JSON.parse(text);
+          throw new Error(data.message || `Server error: ${response.status}`);
+        } catch {
+          throw new Error(text || `Server error: ${response.status}`);
+        }
+      }
+
+      if (!contentType?.includes('application/json')) {
+        throw new Error('Invalid response from server');
+      }
+
+      data = await response.json();
+
+      if (data.success && data.data) {
+        sessionStorage.setItem('reportResult', JSON.stringify(data.data));
+        router.push('/results');
+      } else {
+        throw new Error(data.message || 'Invalid response from server');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
+      setIsUploading(false);
+      setUploadProgress(100);
+    }
+  }, [demographics, router]);
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+    <main className="min-h-screen bg-background">
+      <div className="max-w-[1280px] mx-auto px-6 py-12">
+        <div className="text-center mb-12">
+          <h1 className="text-h1 mb-4">Clinical Clarity</h1>
+          <p className="text-body-lg text-on-surface-variant max-w-2xl mx-auto">
+            Upload your blood lab report to get instant AI-powered biomarker analysis and classification based on your demographics.
           </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
+
+        <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+          <div className="bg-surface-container-low rounded-2xl p-6 shadow-sm">
+            <h2 className="text-h3 mb-6">Your Information</h2>
+            <DemographicsForm onChange={handleDemographicsChange} />
+          </div>
+
+          <div className="bg-surface-container-low rounded-2xl p-6 shadow-sm">
+            <h2 className="text-h3 mb-6">Upload Report</h2>
+            <UploadZone
+              onFileSelect={handleFileSelect}
+              isUploading={isUploading}
+              progress={uploadProgress}
+              disabled={!demographics}
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+            {error && (
+              <p className="mt-4 text-sm text-error">{error}</p>
+            )}
+          </div>
         </div>
-      </main>
-    </div>
+
+        <div className="mt-12 text-center text-body-sm text-on-surface-variant">
+          <p>Your data is processed securely and never stored.</p>
+        </div>
+      </div>
+    </main>
   );
 }
