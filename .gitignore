@@ -50,3 +50,4 @@ docs/
 
 # Agents
 .agents/
+.env*.local

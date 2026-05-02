@@ -1,16 +1,15 @@
 import Groq from 'groq-sdk';
-import { cache } from 'react';
 import type { Patient } from '@/types';
 
 const GROQ_MODEL = 'llama-3.3-70b-versatile';
 
-const getGroqClient = cache((): Groq => {
+function getGroqClient(): Groq {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
     throw new Error('GROQ_API_KEY is not configured');
   }
   return new Groq({ apiKey });
-});
+}
 
 interface ExtractedBiomarker {
   name: string;
