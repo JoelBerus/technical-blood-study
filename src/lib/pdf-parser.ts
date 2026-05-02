@@ -1,18 +1,13 @@
-import { PDFParse } from 'pdf-parse';
+import { extractText, getDocumentProxy } from 'unpdf';
 import { normalizePDFText, extractPageContent } from './text-normalizer';
 
 export async function extractTextFromPDF(buffer: Buffer): Promise<string> {
   try {
-    const workerPath = 'file://' + process.cwd() + '/node_modules/pdf-parse/dist/pdf-parse/esm/pdf.worker.mjs';
-    PDFParse.setWorker(workerPath);
+    const uint8Array = new Uint8Array(buffer);
+    const pdf = await getDocumentProxy(uint8Array);
+    const { text } = await extractText(pdf, { mergePages: true });
     
-    const pdf = new PDFParse({ data: buffer });
-    const textResult = await pdf.getText();
-    
-    const rawText = textResult.text || '';
-    
-    const pageContent = extractPageContent(rawText);
-    
+    const pageContent = extractPageContent(text);
     const normalized = normalizePDFText(pageContent);
     
     return normalized;
